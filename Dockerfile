@@ -71,7 +71,7 @@ ADD download/kenlm-20200308.tar.gz /
 RUN cd /kenlm && \
     mkdir -p build && \
     cd build && \
-    cmake .. && \
+    cmake -DFORCE_STATIC=on .. && \
     make -j $MAKE_THREADS
 
 RUN cd /kenlm/build/bin && \
@@ -178,7 +178,7 @@ COPY download/tools/* /download/
 ENV DOWNLOAD_DIR=/download
 
 # Install tools
-RUN if [ "${TARGET}" != 'armv6']; then \
+RUN if [ "${TARGET}" != 'armv6' ]; then \
     cd /kaldi-master/tools && \
     make -j $MAKE_THREADS; \
     fi
@@ -186,7 +186,7 @@ RUN if [ "${TARGET}" != 'armv6']; then \
 # Fix things for aarch64 (arm64v8)
 COPY linux_atlas_aarch64.mk /kaldi-master/src/makefiles/
 
-RUN if [ "${TARGET}" != 'armv6']; then \
+RUN if [ "${TARGET}" != 'armv6' ]; then \
     cd /kaldi-master/src && \
     bash /set-atlas-dir.sh && \
     ./configure --shared --mathlib=ATLAS --use-cuda=no; \
@@ -196,7 +196,7 @@ COPY fix-configure.sh /
 RUN bash /fix-configure.sh
 
 # Build Kaldi
-RUN if [ "${TARGET}" != 'armv6']; then \
+RUN if [ "${TARGET}" != 'armv6' ]; then \
     cd /kaldi-master/src && \
     make depend -j $MAKE_THREADS && \
     make -j $MAKE_THREADS; \
@@ -204,7 +204,7 @@ RUN if [ "${TARGET}" != 'armv6']; then \
 
 # Fix symbolic links in kaldi/src/lib
 COPY fix-links.sh /
-RUN if [ "${TARGET}" != 'armv6']; then \
+RUN if [ "${TARGET}" != 'armv6' ]; then \
     bash /fix-links.sh /kaldi-master/src/lib/*.so* && \
     mkdir -p /dist/kaldi/egs && \
     cp -R /kaldi-master/egs/wsj /dist/kaldi/egs/ && \
