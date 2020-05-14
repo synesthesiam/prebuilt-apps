@@ -10,6 +10,8 @@ RUN apt-get update && \
         git zlib1g-dev patchelf rsync \
         libboost-all-dev cmake zlib1g-dev libbz2-dev liblzma-dev
 
+ARG MAKE_THREADS=4
+
 FROM build-ubuntu as build-amd64
 
 FROM build-ubuntu as build-armv7
@@ -26,19 +28,17 @@ RUN install_packages \
         git zlib1g-dev patchelf rsync \
         libboost-all-dev cmake zlib1g-dev libbz2-dev liblzma-dev
 
-# -----------------------------------------------------------------------------
-
-ARG TARGETARCH
-ARG TARGETVARIANT
-FROM build-$TARGETARCH$TARGETVARIANT
-
-ARG MAKE_THREADS=8
+ARG MAKE_THREADS=4
 
 # -----------------------------------------------------------------------------
 # Julius
 # https://github.com/julius-speech/julius
 # Output: /julius.tar.gz
 # -----------------------------------------------------------------------------
+
+ARG TARGETARCH
+ARG TARGETVARIANT
+FROM build-$TARGETARCH$TARGETVARIANT as julius
 
 ADD download/julius-2019.tar.gz /
 RUN cd /julius-master && \
@@ -53,6 +53,10 @@ RUN cd /build/julius/bin && tar -czvf /julius.tar.gz *
 # https://kheafield.com/code/kenlm/
 # Output: /kenlm.tar.gz
 # -----------------------------------------------------------------------------
+
+ARG TARGETARCH
+ARG TARGETVARIANT
+FROM build-$TARGETARCH$TARGETVARIANT as kenlm
 
 ADD download/eigen-3.2.8.tar.bz2 /
 RUN cd /eigen-eigen-07105f7124f9 && \
@@ -75,10 +79,51 @@ RUN cd /kenlm/build/bin && \
     tar -czvf /kenlm.tar.gz *
 
 # -----------------------------------------------------------------------------
-# OpenFST
-# http://www.openfst.org
-# Output: /build/openfst
+# Opengrm
+# http://www.opengrm.org/twiki/bin/view/GRM/NGramLibrary
+# Output: /opengrm.tar.gz
 # -----------------------------------------------------------------------------
+
+ARG TARGETARCH
+ARG TARGETVARIANT
+FROM build-$TARGETARCH$TARGETVARIANT as opengrm
+
+ADD download/openfst-1.6.9.tar.gz /
+RUN cd /openfst-1.6.9 && \
+    ./configure --prefix=/build/openfst \
+                --enable-static=no \
+                --enable-far && \
+    make -j $MAKE_THREADS && \
+    make install
+
+ADD download/opengrm-ngram-1.3.4.tar.gz /
+RUN cd /opengrm-ngram-1.3.4 && \
+    mkdir -p build && \
+    export CXXFLAGS=-I/build/openfst/include && \
+    export LDFLAGS=-L/build/openfst/lib && \
+    ./configure --prefix=/build/opengrm && \
+    make -j $MAKE_THREADS && \
+    make install
+
+COPY ensure_symlinks.py /
+
+RUN cd /build/opengrm && \
+    cp /build/openfst/bin/* bin/ && \
+    cp /build/openfst/lib/*.so* lib/ && \
+    rm -f lib/*.a lib/fst/*.a && \
+    python3 /ensure_symlinks.py lib/*.so* && \
+    (strip --strip-unneeded -- bin/* lib/* lib/fst/* || true) && \
+    tar -czf /opengrm.tar.gz -- *
+
+# -----------------------------------------------------------------------------
+# Phonetisaurus
+# https://github.com/AdolfVonKleist/Phonetisaurus
+# Output: /phonetisaurus.tar.gz
+# -----------------------------------------------------------------------------
+
+ARG TARGETARCH
+ARG TARGETVARIANT
+FROM build-$TARGETARCH$TARGETVARIANT as phonetisaurus
 
 ADD download/openfst-1.6.9.tar.gz /
 RUN cd /openfst-1.6.9 && \
@@ -90,34 +135,6 @@ RUN cd /openfst-1.6.9 && \
     make -j $MAKE_THREADS && \
     make install
 
-# -----------------------------------------------------------------------------
-# Opengrm
-# http://www.opengrm.org/twiki/bin/view/GRM/NGramLibrary
-# Output: /opengrm.tar.gz
-# -----------------------------------------------------------------------------
-
-ADD download/opengrm-ngram-1.3.4.tar.gz /
-RUN cd /opengrm-ngram-1.3.4 && \
-    mkdir -p build && \
-    export CXXFLAGS=-I/build/openfst/include && \
-    export LDFLAGS=-L/build/openfst/lib && \
-    ./configure --prefix=/build/opengrm && \
-    make -j $MAKE_THREADS && \
-    make install
-
-RUN cd /build/opengrm && \
-    cp "/build/openfst/bin"/* bin/ && \
-    cp "/build/openfst/lib"/*.so* lib/ && \
-    rm -f lib/*.a lib/fst/*.a && \
-    (strip --strip-unneeded -- bin/* lib/* lib/fst/* || true) && \
-    tar -czf /opengrm.tar.gz -- *
-
-# -----------------------------------------------------------------------------
-# Phonetisaurus
-# https://github.com/AdolfVonKleist/Phonetisaurus
-# Output: /phonetisaurus.tar.gz
-# -----------------------------------------------------------------------------
-
 ADD download/phonetisaurus-2019.tar.gz /
 
 RUN cd /phonetisaurus && \
@@ -127,10 +144,14 @@ RUN cd /phonetisaurus && \
     make -j $MAKE_THREADS && \
     make install
 
-RUN cd /build/phontisaurus && \
-    cp "/build/openfst/bin"/* bin/ && \
-    cp "/build/openfst/lib"/*.so* lib/ && \
+COPY ensure_symlinks.py /
+
+RUN cd /build/phonetisaurus && \
+    mkdir -p bin lib && \
+    cp /build/openfst/bin/* bin/ && \
+    cp /build/openfst/lib/*.so* lib/ && \
     rm -f lib/*.a lib/fst/*.a && \
+    python3 /ensure_symlinks.py lib/*.so* && \
     (strip --strip-unneeded -- bin/* lib/* || true) && \
     tar -czf /phonetisaurus.tar.gz -- *
 
@@ -140,47 +161,74 @@ RUN cd /build/phontisaurus && \
 # Output: /kaldi.tar.gz
 # -----------------------------------------------------------------------------
 
+ARG TARGETARCH
+ARG TARGETVARIANT
+FROM build-$TARGETARCH$TARGETVARIANT as kaldi
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+ENV TARGET=${TARGETARCH}${TARGETVARIANT}
+
 ADD download/kaldi-2020.tar.gz /
 
 # Set ATLASLIBDIR
 COPY set-atlas-dir.sh /
-RUN bash /set-atlas-dir.sh
 
 COPY download/tools/* /download/
 ENV DOWNLOAD_DIR=/download
 
 # Install tools
-RUN cd /kaldi-master/tools && \
-    make -j $MAKE_THREADS
+RUN if [ "${TARGET}" != 'armv6']; then \
+    cd /kaldi-master/tools && \
+    make -j $MAKE_THREADS; \
+    fi
 
 # Fix things for aarch64 (arm64v8)
 COPY linux_atlas_aarch64.mk /kaldi-master/src/makefiles/
 
-RUN cd /kaldi-master/src && \
-    ./configure --shared --mathlib=ATLAS --use-cuda=no
+RUN if [ "${TARGET}" != 'armv6']; then \
+    cd /kaldi-master/src && \
+    bash /set-atlas-dir.sh && \
+    ./configure --shared --mathlib=ATLAS --use-cuda=no; \
+    fi
 
 COPY fix-configure.sh /
 RUN bash /fix-configure.sh
 
 # Build Kaldi
-RUN cd /kaldi-master/src && \
+RUN if [ "${TARGET}" != 'armv6']; then \
+    cd /kaldi-master/src && \
     make depend -j $MAKE_THREADS && \
-    make -j $MAKE_THREADS
+    make -j $MAKE_THREADS; \
+    fi
 
 # Fix symbolic links in kaldi/src/lib
 COPY fix-links.sh /
-RUN bash /fix-links.sh /kaldi-master/src/lib/*.so*
-
-RUN mkdir -p /dist/kaldi/egs && \
+RUN if [ "${TARGET}" != 'armv6']; then \
+    bash /fix-links.sh /kaldi-master/src/lib/*.so* && \
+    mkdir -p /dist/kaldi/egs && \
     cp -R /kaldi-master/egs/wsj /dist/kaldi/egs/ && \
     rsync -av --exclude='*.o' --exclude='*.cc' /kaldi-master/src/bin/ /dist/kaldi/ && \
     cp /kaldi-master/src/lib/*.so* /dist/kaldi/ && \
     rsync -av --include='*.so*' --include='fst' --exclude='*' /kaldi-master/tools/openfst/lib/ /dist/kaldi/ && \
-    cp /kaldi-master/tools/openfst/bin/ /dist/kaldi/
+    cp /kaldi-master/tools/openfst/bin/* /dist/kaldi/ && \
+    find /dist/kaldi/ -type f -exec patchelf --set-rpath '$ORIGIN' {} \; && \
+    (strip --strip-unneeded -- /dist/kaldi/* || true) && \
+    tar -C /dist -czvf /kaldi.tar.gz kaldi; \
+    else \
+    touch /kaldi.tar.gz; \
+    fi
 
-# Fix rpaths
-RUN find /dist/kaldi/ -type f -exec patchelf --set-rpath '$ORIGIN' {} \;
+# -----------------------------------------------------------------------------
 
-# Strip and compress
-RUN (strip --strip-unneeded -- /dist/kaldi/* || true) && \
-    tar -C /dist -czvf /kaldi.tar.gz .
+FROM scratch
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+ENV TARGET=${TARGETARCH}${TARGETVARIANT}
+
+COPY --from=julius /julius.tar.gz /julius-4.5_${TARGET}.tar.gz
+COPY --from=kenlm /kenlm.tar.gz /kenlm-20200308_${TARGET}.tar.gz
+COPY --from=opengrm /opengrm.tar.gz /opengrm-1.3.4_${TARGET}.tar.gz
+COPY --from=phonetisaurus /phonetisaurus.tar.gz /phonetisaurus-2019_${TARGET}.tar.gz
+COPY --from=kaldi /kaldi.tar.gz /kaldi-2020_${TARGET}.tar.gz
