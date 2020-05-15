@@ -188,7 +188,11 @@ COPY linux_atlas_aarch64.mk /kaldi-master/src/makefiles/
 
 RUN if [ "${TARGET}" != 'armv6' ]; then \
     cd /kaldi-master/src && \
-    bash /set-atlas-dir.sh && \
+    if [ -f '/usr/lib/arm-linux-gnueabihf/libatlas.so' ]; then \
+        export ATLASLIBDIR='/usr/lib/arm-linux-gnueabihf'; \
+    elif [ -f '/usr/lib/aarch64-linux-gnu/libatlas.so' ]; then \
+        export ATLASLIBDIR='/usr/lib/aarch64-linux-gnu'; \
+    fi && \
     ./configure --shared --mathlib=ATLAS --use-cuda=no; \
     fi
 

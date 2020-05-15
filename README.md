@@ -7,6 +7,7 @@ Docker [buildx](https://docs.docker.com/buildx/working-with-buildx/) compilation
 * Speech to text
     * [Julius](https://github.com/julius-speech/julius)
     * [Kaldi](https://kaldi-asr.org)
+        * Not supported on `arm/v6`
 * Language modeling
     * [KenLM](https://kheafield.com/code/kenlm/)
 * Grapheme to phoneme
@@ -24,9 +25,9 @@ Docker [buildx](https://docs.docker.com/buildx/working-with-buildx/) compilation
 Set the `DOCKER_REGISTRY` environment variable to your local Docker registry (needed for manifest support). Make sure to include a final `/`
 
 ```bash
-$ export DOCKER_REGISTRY=my-local-registry:12345/
+$ git clone https://github.com/synesthesiam/prebuilt-apps.git
+$ cd prebuilt-apps/
 $ make
-$ make dist
 ```
 
-Artifacts will be in the `dist/` directory.
+This may take all day and all night. Artifacts will be in the `dist/` directory.
