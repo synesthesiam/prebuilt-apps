@@ -212,7 +212,7 @@ RUN if [ "${TARGET}" != 'armv6' ]; then \
     bash /fix-links.sh /kaldi-master/src/lib/*.so* && \
     mkdir -p /dist/kaldi/egs && \
     cp -R /kaldi-master/egs/wsj /dist/kaldi/egs/ && \
-    rsync -av --exclude='*.o' --exclude='*.cc' /kaldi-master/src/bin/ /dist/kaldi/ && \
+    find /kaldi-master/src/ -type f -executable -exec cp {} /dist/kaldi/ \; && \
     cp /kaldi-master/src/lib/*.so* /dist/kaldi/ && \
     rsync -av --include='*.so*' --include='fst' --exclude='*' /kaldi-master/tools/openfst/lib/ /dist/kaldi/ && \
     cp /kaldi-master/tools/openfst/bin/* /dist/kaldi/ && \
