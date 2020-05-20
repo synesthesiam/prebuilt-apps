@@ -224,6 +224,27 @@ RUN if [ "${TARGET}" != 'armv6' ]; then \
     fi
 
 # -----------------------------------------------------------------------------
+# NanoTTS
+# https://github.com/gmn/nanotts
+# Output: /nanotts.tar.gz
+# -----------------------------------------------------------------------------
+
+ARG TARGETARCH
+ARG TARGETVARIANT
+FROM build-$TARGETARCH$TARGETVARIANT as nanotts
+
+ADD download/nanotts-20200520.tar.gz /
+RUN cd /nanotts-master && \
+    make -j $MAKE_THREADS noalsa
+
+RUN mkdir -p /build/nanotts/bin && \
+    mkdir -p /build/nanotts/share/pico && \
+    cp /nanotts-master/nanotts /build/nanotts/bin/ && \
+    cp -R /nanotts-master/lang /build/nanotts/share/pico/
+
+RUN cd /build/nanotts && tar -czvf /nanotts.tar.gz *
+
+# -----------------------------------------------------------------------------
 
 FROM scratch
 ARG TARGETARCH
@@ -236,3 +257,4 @@ COPY --from=kenlm /kenlm.tar.gz /kenlm-20200308_${TARGET}.tar.gz
 COPY --from=opengrm /opengrm.tar.gz /opengrm-1.3.4_${TARGET}.tar.gz
 COPY --from=phonetisaurus /phonetisaurus.tar.gz /phonetisaurus-2019_${TARGET}.tar.gz
 COPY --from=kaldi /kaldi.tar.gz /kaldi-2020_${TARGET}.tar.gz
+COPY --from=nanotts /nanotts.tar.gz /nanotts-20200520_${TARGET}.tar.gz

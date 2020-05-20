@@ -12,6 +12,8 @@ Docker [buildx](https://docs.docker.com/buildx/working-with-buildx/) compilation
     * [KenLM](https://kheafield.com/code/kenlm/)
 * Grapheme to phoneme
     * [Phonetisaurus](https://github.com/AdolfVonKleist/Phonetisaurus)
+* Text to Speech
+    * [nanoTTS](https://github.com/gmn/nanotts)
 
 ## Platforms
 
