@@ -10,6 +10,7 @@ Docker [buildx](https://docs.docker.com/buildx/working-with-buildx/) compilation
         * Not supported on `arm/v6`
 * Language modeling
     * [KenLM](https://kheafield.com/code/kenlm/)
+    * [MITLM](https://github.com/mitlm/mitlm)
 * Grapheme to phoneme
     * [Phonetisaurus](https://github.com/AdolfVonKleist/Phonetisaurus)
 * Text to Speech
